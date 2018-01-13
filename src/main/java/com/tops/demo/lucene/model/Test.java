@@ -18,6 +18,7 @@ public class Test implements Serializable {
 	private String author;
 	private String content;
 	private Integer sequence;
+	private Double distance;
 
 	// 经纬度
 	private double lat;
@@ -69,6 +70,14 @@ public class Test implements Serializable {
 
 	public void setLon(double lon) {
 		this.lon = lon;
+	}
+
+	public Double getDistance() {
+		return distance;
+	}
+
+	public void setDistance(Double distance) {
+		this.distance = distance;
 	}
 
 }

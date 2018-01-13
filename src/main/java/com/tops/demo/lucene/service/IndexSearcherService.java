@@ -8,6 +8,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.LatLonDocValuesField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
@@ -18,8 +19,6 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.SortField.Type;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
@@ -28,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import com.tops.demo.lucene.model.Test;
 import com.tops.demo.lucene.model.TestQo;
+import com.tops.demo.lucene.utils.DistanceUtil;
 
 /**
  * search
@@ -56,7 +56,7 @@ public class IndexSearcherService {
 		IndexSearcher lvSearcher = new IndexSearcher(lvReader);;
 		
 		// sort
-		TopDocs lvDocs = lvSearcher.search(this.createQuery(pQo), 100, this.createSort());
+		TopDocs lvDocs = lvSearcher.search(this.createQuery(pQo), 100, this.createSort(pQo));
 		int lvTotalHits = Math.toIntExact(lvDocs.totalHits);
 		for (int i = 0; i < lvTotalHits; i++) {
 			
@@ -67,6 +67,10 @@ public class IndexSearcherService {
 			lvArticle.setAuthor(doc.get("author"));
 			lvArticle.setContent(doc.get("content"));
 			lvArticle.setSequence(Integer.parseInt(doc.get("sequence")));
+			lvArticle.setLat(Double.parseDouble(doc.get("lat")));
+			lvArticle.setLon(Double.parseDouble(doc.get("lon")));
+			
+			lvArticle.setDistance(DistanceUtil.calcDistance(pQo.getLat(), pQo.getLon(), lvArticle.getLat(), lvArticle.getLon()));
 			
 			lvResults.add(lvArticle);
 		}
@@ -96,11 +100,25 @@ public class IndexSearcherService {
 			lvBuilder.add(new BooleanClause(new TermQuery(new Term("author", pQo.getAuthor())), BooleanClause.Occur.MUST));
 		}
 		
+		// 搜索附近
+		if (pQo.getLat() != null && pQo.getLon() != null) {
+			lvBuilder.add(new BooleanClause(LatLonDocValuesField.newSlowDistanceQuery("coord", pQo.getLat(), pQo.getLon(), pQo.getDistance()), BooleanClause.Occur.MUST));
+		}
+		
 		return lvBuilder.build();
 	}
 	
-	private Sort createSort() {
-		return new Sort(new SortField("sequence", Type.INT, false)); // true从大到小 false从小到大
+	private Sort createSort(TestQo pQo) {
+//		return new Sort(new SortField("sequence", Type.INT, false)); // true从大到小 false从小到大
+		return new Sort(LatLonDocValuesField.newDistanceSort("coord", pQo.getLat(), pQo.getLon()));
+	}
+	
+	public static void main(String[] args) throws IOException, ParseException {
+		new IndexWriteService().createIndex(true);
+		
+		TestQo qo = new TestQo();
+		qo.setAuthor("张三");
+		System.out.println(new IndexSearcherService().search(qo).size());
 	}
 	
 }
